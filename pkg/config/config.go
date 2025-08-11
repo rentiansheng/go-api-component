@@ -96,3 +96,30 @@ func (c *Config) LoadConfig(config interface{}) error {
 
 	return nil
 }
+
+var (
+	GetBool                 = viper.GetBool
+	GetString               = viper.GetString
+	GetInt                  = viper.GetInt
+	GetFloat64              = viper.GetFloat64
+	GetStringSlice          = viper.GetStringSlice
+	GetStringMap            = viper.GetStringMap
+	GetStringMapString      = viper.GetStringMapString
+	GetStringMapStringSlice = viper.GetStringMapStringSlice
+	GetDuration             = viper.GetDuration
+	GetTime                 = viper.GetTime
+	GetIntSlice             = viper.GetIntSlice
+	GetInt64                = viper.GetInt64
+	GetInt32                = viper.GetInt32
+	GetUint                 = viper.GetUint
+	GetUint64               = viper.GetUint64
+	GetUint32               = viper.GetUint32
+	GetUint16               = viper.GetUint16
+	GetUint8                = viper.GetUint8
+
+	GetSizeInBytes = viper.GetSizeInBytes
+
+	GetViper  = viper.GetViper
+	Get       = viper.Get
+	Unmarshal = viper.UnmarshalKey
+)

@@ -12,9 +12,9 @@ import (
 type Log struct {
 	Level      string `mapstructure:"level"`
 	Dir        string `mapstructure:"dir"`
-	MaxFileMB  int    `mapstructure:"maxFileMB"`
-	MaxBackups int    `mapstructure:"maxBackups"`
-	MaxAgeDays int    `mapstructure:"maxAgeDays"`
+	MaxFileMB  int    `mapstructure:"max_file_mb"` // 每个日志文件最大大小，单位MB
+	MaxBackups int    `mapstructure:"max_backups"`
+	MaxAgeDays int    `mapstructure:"max_age_days"`
 	Compress   bool   `mapstructure:"compress"`
 }
 
