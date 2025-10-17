@@ -21,6 +21,7 @@ type ginContext struct {
 	pageResponse  interface{}
 	data          interface{}
 	requestID     string
+	spanID        string
 	ctx           osCtx.Context
 	responseFile  struct {
 		fileName string
@@ -45,21 +46,6 @@ func (g *ginContext) Cancel() osCtx.CancelFunc {
 // Cookie implements Contexts.
 func (g *ginContext) Cookie() []*http.Cookie {
 	return g.c.Request.Cookies()
-}
-
-// Deadline implements Contexts.
-func (g *ginContext) Deadline() (deadline time.Time, ok bool) {
-	return g.ctx.Deadline()
-}
-
-// Done implements Contexts.
-func (g *ginContext) Done() <-chan struct{} {
-	return g.ctx.Done()
-}
-
-// Err implements Contexts.
-func (g *ginContext) Err() error {
-	return g.ctx.Err()
 }
 
 // Error implements Contexts.
@@ -143,21 +129,18 @@ func (c *ginContext) clone() *ginContext {
 	ctx := osCtx.WithValue(c.ctx, "_", c.Value("_"))
 	// copy all fields
 	return &ginContext{
-		ctx: ctx,
-		c:   c.c,
+		ctx:           ctx,
+		c:             c.c,
 		extraResponse: c.extraResponse,
-		pageResponse: c.pageResponse,
-		data:         c.data,
-		requestID:    c.requestID,
-		responseFile: c.responseFile,
-		rawResponse:  c.rawResponse,
-		cancelFn:     c.cancelFn,
-		meErr:        c.meErr,
+		pageResponse:  c.pageResponse,
+		data:          c.data,
+		requestID:     c.requestID,
+		responseFile:  c.responseFile,
+		rawResponse:   c.rawResponse,
+		cancelFn:      c.cancelFn,
+		meErr:         c.meErr,
 	}
 }
-
- 
- 
 
 // SubContext implements Contexts.
 func (g *ginContext) SubContext(suffix string) Context {
@@ -169,34 +152,40 @@ func (g *ginContext) SubContext(suffix string) Context {
 
 }
 
-// Value implements Contexts.
-func (g *ginContext) Value(key any) any {
-	panic("unimplemented")
-}
-
 // WithSpan implements Contexts.
 func (g *ginContext) WithSpan() Context {
-	panic("unimplemented")
+	newCtx := g.clone()
+	newCtx.spanID = NewLogID()
+	newCtx.ctx = osCtx.WithValue(newCtx.ctx, spanIDKey, newCtx.spanID)
+	return newCtx
 }
 
 // WithSpanID implements Contexts.
 func (g *ginContext) WithSpanID(id string) Context {
-	panic("unimplemented")
+	newCtx := g.clone()
+	newCtx.spanID = id
+	newCtx.ctx = osCtx.WithValue(newCtx.ctx, spanIDKey, id)
+	return newCtx
 }
 
 // WithSpanPrefix implements Contexts.
 func (g *ginContext) WithSpanPrefix(prefix string) Context {
-	panic("unimplemented")
+	newCtx := g.clone()
+	newCtx.spanID = prefix + "-" + NewLogID()
+	newCtx.ctx = osCtx.WithValue(newCtx.ctx, spanIDKey, newCtx.spanID)
+	return newCtx
 }
 
 // WithTimeoutCtx implements Contexts.
 func (g *ginContext) WithTimeoutCtx(timeout time.Duration) Context {
-	panic("unimplemented")
+	newCtx := g.clone()
+	newCtx.ctx, newCtx.cancelFn = osCtx.WithTimeout(newCtx.ctx, timeout)
+	return newCtx
 }
 
 // WithValue implements Contexts.
 func (g *ginContext) WithValue(key interface{}, value interface{}) {
-	panic("unimplemented")
+	g.ctx = osCtx.WithValue(g.ctx, key, value)
 }
 
 // NewGinContext creates a new context wrapper for gin.Context

@@ -7,7 +7,7 @@ import (
 // Deadline returns the time when work done on behalf of this context
 // should be canceled. Deadline returns ok==false when no deadline is
 // set. Successive calls to Deadline return the same results.
-func (c *contexts) Deadline() (deadline time.Time, ok bool) {
+func (c *ginContext) Deadline() (deadline time.Time, ok bool) {
 	return c.ctx.Deadline()
 }
 
@@ -42,7 +42,7 @@ func (c *contexts) Deadline() (deadline time.Time, ok bool) {
 //
 // See https://blog.golang.org/pipelines for more examples of how to use
 // a Done channel for cancellation.
-func (c *contexts) Done() <-chan struct{} {
+func (c *ginContext) Done() <-chan struct{} {
 	return c.ctx.Done()
 }
 
@@ -51,7 +51,7 @@ func (c *contexts) Done() <-chan struct{} {
 // Canceled if the context was canceled
 // or DeadlineExceeded if the context's deadline passed.
 // After Err returns a non-nil error, successive calls to Err return the same error.
-func (c *contexts) Err() error {
+func (c *ginContext) Err() error {
 	return c.ctx.Err()
 }
 
@@ -100,6 +100,6 @@ func (c *contexts) Err() error {
 //		u, ok := ctx.Value(userKey).(*User)
 //		return u, ok
 //	}
-func (c *contexts) Value(key interface{}) interface{} {
+func (c *ginContext) Value(key interface{}) interface{} {
 	return c.ctx.Value(key)
 }
