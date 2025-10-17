@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"github.com/emicklei/go-restful/v3"
+	"github.com/gin-gonic/gin"
 	"net/http"
 	path2 "path"
 )
@@ -18,23 +18,26 @@ type Web interface {
 
 	Route(r Route)
 
-	Routes() *restful.WebService
+	RegisterGinRoutes(engine *gin.Engine)
 }
 
 type Route interface {
 	NoLogin() Route
 	NeedLogin() Route
 	Handler(h Handler) Route
-	RestfulRoute(root string) *restful.RouteBuilder
+	GetPath() string
+	GetMethod() string
+	GetHandler() Handler
+	IsLoginRequired() bool
 }
 
 type ContentType string
 
 const (
-	ContentTypeJSON        ContentType = restful.MIME_JSON
-	ContentTypeXML         ContentType = restful.MIME_XML
-	ContentTypeZIP         ContentType = restful.MIME_ZIP
-	ContentTypeOctetStream ContentType = restful.MIME_OCTET
+	ContentTypeJSON        ContentType = "application/json"
+	ContentTypeXML         ContentType = "application/xml"
+	ContentTypeZIP         ContentType = "application/zip"
+	ContentTypeOctetStream ContentType = "application/octet-stream"
 	ContentTypeProtoBuf    ContentType = "application/x-protobuf"
 	ContentTypeMsgPack     ContentType = "application/x-msgpack"
 	ContentTypeYaml        ContentType = "application/x-yaml"
@@ -94,16 +97,76 @@ func (w *web) Root(root string) {
 
 func (w *web) Route(r Route) {
 	w.routers = append(w.routers, r)
+type web struct {
+	routers []Route
+	root    string
 }
 
-func (w *web) Routes() *restful.WebService {
-	web := &restful.WebService{}
-	web.Path(w.root)
-	for _, r := range w.routers {
-		web.Route(r.RestfulRoute(w.root))
-	}
+func (w web) Get(path string) Route {
+	r := &route{method: http.MethodGet, path: path}
+	return r
+}
 
-	return web
+func (w web) Post(path string) Route {
+	r := &route{method: http.MethodPost, path: path}
+	return r
+}
+
+func (w web) Put(path string) Route {
+	r := &route{method: http.MethodPut, path: path}
+	return r
+}
+
+func (w web) Delete(path string) Route {
+	r := &route{method: http.MethodDelete, path: path}
+	return r
+}
+
+func (w web) Patch(path string) Route {
+	r := &route{method: http.MethodPatch, path: path}
+	return r
+}
+
+func (w web) Head(path string) Route {
+	r := &route{method: http.MethodHead, path: path}
+	return r
+}
+
+func (w web) Options(path string) Route {
+	r := &route{method: http.MethodOptions, path: path}
+	return r
+}
+
+func (w *web) Root(root string) {
+	w.root = root
+}
+
+func (w *web) Route(r Route) {
+	w.routers = append(w.routers, r)
+}
+
+func (w *web) RegisterGinRoutes(engine *gin.Engine) {
+	for _, r := range w.routers {
+		fullPath := path2.Join(w.root, r.GetPath())
+		handler := wrapGinHandler(r.GetHandler(), r.IsLoginRequired())
+		
+		switch r.GetMethod() {
+		case http.MethodGet:
+			engine.GET(fullPath, handler)
+		case http.MethodPost:
+			engine.POST(fullPath, handler)
+		case http.MethodPut:
+			engine.PUT(fullPath, handler)
+		case http.MethodDelete:
+			engine.DELETE(fullPath, handler)
+		case http.MethodPatch:
+			engine.PATCH(fullPath, handler)
+		case http.MethodHead:
+			engine.HEAD(fullPath, handler)
+		case http.MethodOptions:
+			engine.OPTIONS(fullPath, handler)
+		}
+	}
 }
 
 type route struct {
@@ -114,83 +177,67 @@ type route struct {
 	contentType ContentType
 }
 
-func (r route) Get(path string) Route {
-	r.method = http.MethodGet
-	return r.Path(path)
-}
-
-func (r route) Post(path string) Route {
-	r.method = http.MethodPost
-	return r.Path(path)
-}
-
-func (r route) Put(path string) Route {
-	r.method = http.MethodPut
-	return r.Path(path)
-}
-
-func (r route) Delete(path string) Route {
-	r.method = http.MethodDelete
-	return r.Path(path)
-}
-
-func (r route) Patch(path string) Route {
-	r.method = http.MethodPatch
-	return r.Path(path)
-}
-
-func (r route) Head(path string) Route {
-	r.method = http.MethodHead
-	return r.Path(path)
-}
-
-func (r route) Options(path string) Route {
-	r.method = http.MethodOptions
-	return r.Path(path)
-}
-
-// 默认是需要登录的
-func (r route) NoLogin() Route {
+func (r *route) NoLogin() Route {
 	r.noLogin = true
 	return r
 }
 
-func (r route) NeedLogin() Route {
+func (r *route) NeedLogin() Route {
 	r.noLogin = false
 	return r
 }
 
-func (r route) Path(path string) Route {
-	r.path = path
-	return r
-}
-
-func (r route) Handler(h Handler) Route {
+func (r *route) Handler(h Handler) Route {
 	r.handler = h
 	return r
 }
 
-func (r route) Produces(contentType ContentType) Route {
-	r.contentType = contentType
-	return r
+func (r *route) GetPath() string {
+	return r.path
 }
 
-func (r route) RestfulRoute(root string) *restful.RouteBuilder {
+func (r *route) GetMethod() string {
+	return r.method
+}
 
-	o := DefaultOption()
-	if r.noLogin {
-		o = o.WithNoLogin()
+func (r *route) GetHandler() Handler {
+	return r.handler
+}
+
+func (r *route) IsLoginRequired() bool {
+	return !r.noLogin
+}
+
+// wrapGinHandler converts our Handler to gin.HandlerFunc
+func wrapGinHandler(handler Handler, needLogin bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Create context wrapper
+		ctx := NewGinContext(c)
+		
+		// TODO: Add login check if needLogin is true
+		// if needLogin {
+		//     // Add authentication middleware logic here
+		// }
+		
+		// Call the handler
+		result, err := handler(ctx)
+		
+		// Handle the response
+		if err != nil {
+			// Handle error response
+			c.JSON(err.Code(), gin.H{
+				"code":    err.Code(),
+				"message": err.Message(),
+				"data":    nil,
+			})
+			return
+		}
+		
+		// Handle success response
+		c.JSON(200, gin.H{
+			"code":    0,
+			"message": "success",
+			"data":    result,
+		})
 	}
-	path := r.path
-	if len(root) != 0 {
-		path = path2.Join(root, path)
-	}
-	rb := &restful.RouteBuilder{}
-	rb = rb.Method(r.method).Path(path).To(wrapperOptions(r.handler, o))
-	if len(r.contentType) != 0 {
-		rb = rb.Produces(string(r.contentType))
-	} else {
-		rb = rb.Produces(restful.MIME_JSON)
-	}
-	return rb
 }

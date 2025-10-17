@@ -1,7 +1,7 @@
 package router
 
 import (
-	"github.com/emicklei/go-restful/v3"
+	"github.com/gin-gonic/gin"
 )
 
 var (
@@ -9,7 +9,7 @@ var (
 )
 
 type Router interface {
-	Routes() *restful.WebService
+	RegisterGinRoutes(engine *gin.Engine)
 }
 
 func Register(r Router) {

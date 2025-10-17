@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/emicklei/go-restful/v3"
+	"github.com/gin-gonic/gin"
 	"github.com/rentiansheng/go-api-component/pkg/logger"
 	"github.com/rentiansheng/go-api-component/server/router"
 )
@@ -86,12 +86,13 @@ func (h *httpServer) Run() error {
 	if h.l != nil {
 		logger.Config(h.name, *h.l)
 	}
-	container := h.initRoutes()
+	
+	router := h.initRoutes()
 
 	// Create server with timeouts
 	server := &http.Server{
 		Addr:         ":" + h.s.Port,
-		Handler:      container,
+		Handler:      router,
 		ReadTimeout:  h.s.ReadTimeout,
 		WriteTimeout: h.s.WriteTimeout,
 	}
@@ -118,55 +119,88 @@ func (h *httpServer) Run() error {
 	return server.Shutdown(ctx)
 }
 
-func (h *httpServer) initRoutes() *restful.Container {
+func (h *httpServer) initRoutes() *gin.Engine {
+	// Set gin mode
+	gin.SetMode(gin.ReleaseMode)
 
-	// Create container
-	container := restful.NewContainer()
+	// Create gin engine
+	engine := gin.New()
+
+	// Add middleware
+	engine.Use(gin.Logger())
+	engine.Use(gin.Recovery())
 
 	if h.s.Cors.EnableCORS {
-		s := h.s
-		// Add CORS support
-		cors := restful.CrossOriginResourceSharing{
-			AllowedHeaders: s.Cors.AllowedHeaders, // []string{"Content-Type", "Accept", "Authorization"},
-			AllowedMethods: s.Cors.AllowedMethods, // []string{"GET", "POST", "PUT", "DELETE"},
-			AllowedDomains: s.Cors.AllowedDomains, //[]string{"*"},
-			CookiesAllowed: s.Cors.CookiesAllowed, //true,
-			Container:      container,
-		}
-		container.Filter(cors.Filter)
+		// Add CORS middleware
+		engine.Use(h.corsMiddleware())
 	}
-
-	// Add logging filter
-	container.Filter(logFilter)
-
-	// Enable debugging
-	restful.EnableTracing(true)
-	restful.DefaultContainer.EnableContentEncoding(true)
 
 	// Register routes
-	registerRoutes(container, router.Get())
+	registerRoutes(engine, router.Get())
 
-	return container
+	return engine
 }
 
-func registerRoutes(container *restful.Container, routers []router.Router) {
-	for _, r := range routers {
-		ws := r.Routes()
-		container.Add(ws)
-		for _, route := range ws.Routes() {
-			log.Printf("Registered route: %s %s", route.Method, route.Path)
+func (h *httpServer) corsMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		s := h.s.Cors
+		
+		origin := c.Request.Header.Get("Origin")
+		if origin != "" {
+			// Check if origin is allowed
+			allowed := false
+			for _, domain := range s.AllowedDomains {
+				if domain == "*" || domain == origin {
+					allowed = true
+					break
+				}
+			}
+			
+			if allowed {
+				c.Header("Access-Control-Allow-Origin", origin)
+			}
 		}
+		
+		// Set other CORS headers
+		if len(s.AllowedMethods) > 0 {
+			methods := ""
+			for i, method := range s.AllowedMethods {
+				if i > 0 {
+					methods += ", "
+				}
+				methods += method
+			}
+			c.Header("Access-Control-Allow-Methods", methods)
+		}
+		
+		if len(s.AllowedHeaders) > 0 {
+			headers := ""
+			for i, header := range s.AllowedHeaders {
+				if i > 0 {
+					headers += ", "
+				}
+				headers += header
+			}
+			c.Header("Access-Control-Allow-Headers", headers)
+		}
+		
+		if s.CookiesAllowed {
+			c.Header("Access-Control-Allow-Credentials", "true")
+		}
+		
+		// Handle preflight requests
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		
+		c.Next()
 	}
 }
 
-func logFilter(req *restful.Request, resp *restful.Response, chain *restful.FilterChain) {
-	start := time.Now()
-
-	// Log request details
-	log.Printf("[REQUEST] %s %s %s", req.Request.Method, req.Request.URL.Path, req.Request.RemoteAddr)
-
-	chain.ProcessFilter(req, resp)
-
-	duration := time.Since(start)
-	log.Printf("[RESPONSE] %s %s %s %v", req.Request.Method, req.Request.URL.Path, req.Request.RemoteAddr, duration)
+func registerRoutes(engine *gin.Engine, routers []router.Router) {
+	for _, r := range routers {
+		r.RegisterGinRoutes(engine)
+		log.Printf("Registered router: %T", r)
+	}
 }
