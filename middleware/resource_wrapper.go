@@ -7,7 +7,7 @@ import (
 	"strings"
 	"sync"
 
-	gorestful "github.com/emicklei/go-restful/v3"
+	"github.com/gin-gonic/gin"
 	coreContext "github.com/rentiansheng/go-api-component/middleware/context"
 	"github.com/rentiansheng/go-api-component/middleware/errors"
 )
@@ -60,24 +60,25 @@ func FailResponse(retcode int, message string, data interface{}) HttpJsonRespons
 	}
 }
 
-func Wrapper(h Handler) func(r *gorestful.Request, w *gorestful.Response) {
+func Wrapper(h Handler) func(g *gin.Context) {
 	return wrapperOptions(func(ctx coreContext.Contexts) errors.Error {
 		return h(ctx)
 	}, DefaultOption())
 }
 
-func wrapperOptions(h Handler, o Option) func(r *gorestful.Request, w *gorestful.Response) {
-	return func(r *gorestful.Request, w *gorestful.Response) {
-		ctx := coreContext.NewContext(r.Request.Context(), r, w)
+func wrapperOptions(h Handler, o Option) func(g *gin.Context) {
+	return func(g *gin.Context) {
+		ctx := coreContext.NewContext(g)
 
 		requestID := ctx.GetRequestID()
-		w.AddHeader(responseHTTHeaderRequestID, requestID)
+		g.Writer.Header().Add(responseHTTHeaderRequestID, requestID)
 
 		// 从panic中恢复
 		defer func() {
 			if e := recover(); e != nil {
 				ctx.Log().Panicf("panic. err: %#v", e)
-				_ = w.WriteAsJson(e)
+				// gin  返回 json
+				g.JSON(500, e)
 				return
 			}
 		}()
@@ -98,31 +99,34 @@ func wrapperOptions(h Handler, o Option) func(r *gorestful.Request, w *gorestful
 		}
 		if err != nil {
 			if eerr, ok := err.(errors.Error); ok {
-				_ = w.WriteAsJson(FailResponse(int(eerr.Code()), eerr.Message(), data))
+				g.JSON(200, FailResponse(int(eerr.Code()), eerr.Message(), data))
 			} else {
-				_ = w.WriteAsJson(FailResponse(-1, err.Error(), data))
+				g.JSON(500, FailResponse(-1, err.Error(), data))
 			}
 		} else {
 
 			if fileName, fileContent, exists := ctx.GetResponseFile(); exists {
+				// 返回文件下载
+				w := g.Writer
 				w.Header().Add("Content-Disposition", "attachment; filename="+fileName)
 				w.Header().Add("Content-Type", "application/octet-stream")
 				w.Header().Add("Content-Length", fmt.Sprintf("%d", fileContent.Len()))
 				_, _ = w.Write(fileContent.Bytes())
 
 			} else if typ, body, exists := ctx.GetRawResponse(); exists {
-
+				w := g.Writer
 				if typ != "" {
 					w.Header().Add("Content-Type", typ)
 				}
 				w.Header().Add("Content-Length", fmt.Sprintf("%d", len(body)))
 				_, _ = w.Write(body)
 			} else {
+
 				extraRespData := ctx.GetExtraResponse()
 				if len(extraRespData) > 0 {
-					_ = w.WriteAsJson(OkResponseExtra("", data, extraRespData))
+					g.JSON(200, OkResponseExtra("", data, extraRespData))
 				} else {
-					_ = w.WriteAsJson(OkResponse("", data))
+					g.JSON(200, OkResponse("", data))
 				}
 			}
 		}
