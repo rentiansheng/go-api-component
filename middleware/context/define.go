@@ -108,8 +108,8 @@ func NewSysContext(ctx osCtx.Context) Context {
 // NewContext 不能向 Contexts 对象转换，回panic
 func NewContext(g *gin.Context) Contexts {
 	ctx := g.Request.Context()
-	if rctx, ok := ctx.(*ginContext); ok {
-		newCtx := rctx.clone()
+	if rCtx, ok := ctx.(*ginContext); ok {
+		newCtx := rCtx.clone()
 		return newCtx
 	} else {
 		ctx = AdjustCtxLogID(ctx)
