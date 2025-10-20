@@ -15,11 +15,10 @@ import (
 
 func TestErr_Error(t *testing.T) {
 	outputs := []string{
-		"middleware/errors/error.go:",
-		"middleware/errors/error.go:",
-		"middleware/context/err.go:",
-		"middleware/context/err_test.go:",
-		"go/src/testing/testing.go:",
+		"go-api-component/middleware/errors/error.go:",
+		"go-api-component/middleware/errors/error.go:",
+		"go-api-component/middleware/context/err.go:",
+		"go-api-component/middleware/context/err_test.go:",
 	}
 	appErr := (&err{}).Error(-1, fmt.Errorf("app error"))
 	callers := appErr.Caller()

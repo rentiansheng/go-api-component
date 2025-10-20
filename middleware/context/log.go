@@ -108,7 +108,7 @@ func (l *log) ErrorJSON(format string, args ...interface{}) {
 func (l *log) LogAndReturnErr(format string, args ...interface{}) error {
 	args = argsJSON(args...)
 	er := fmt.Errorf(format, args...)
-	logrus.Errorf(l.logPrefix() + er.Error() + "\n")
+	logrus.Error(l.logPrefix() + er.Error() + "\n")
 	return er
 }
 
@@ -135,7 +135,7 @@ func (l *log) Debug(message string) {
 // DebugJSON 根据arg 的Error() string, String() string 来输出参数，  会将Struct，Interface,Array,Map, Slice复杂结构默认转换未json
 func (l *log) DebugJSON(format string, args ...interface{}) {
 	args = argsJSON(args...)
-	logrus.Debugf(l.logPrefix() + format + "\n")
+	logrus.Debugf(l.logPrefix()+format+"\n", args...)
 }
 
 func (l *log) Panic(message string) {
@@ -205,7 +205,7 @@ func (l *log) logPrefix() string {
 }
 
 func (l *log) logSpanID() string {
-	return fmt.Sprintf("span_id|%v|", l.ctx.Value(spanIDKey))
+	return fmt.Sprintf("trace_id:%v|span_id|%v|", l.ctx.Value(CtxLogIDKey), l.ctx.Value(spanIDKey))
 }
 
 func codeFilePath() string {

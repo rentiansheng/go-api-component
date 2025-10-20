@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	path2 "path"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Web interface {
@@ -57,84 +58,39 @@ type web struct {
 }
 
 func (w web) Get(path string) Route {
-	o := route{}
-	return o.Get(path)
+	r := &route{}
+	return r.Get(path)
 }
 
 func (w web) Post(path string) Route {
-	o := route{}
-	return o.Post(path)
+	r := &route{}
+	return r.Post(path)
 }
 
 func (w web) Put(path string) Route {
-	o := route{}
-	return o.Put(path)
+	r := &route{}
+	return r.Put(path)
+
 }
 
 func (w web) Delete(path string) Route {
-	o := route{}
-	return o.Delete(path)
+	r := &route{}
+	return r.Delete(path)
 }
 
 func (w web) Patch(path string) Route {
-	o := route{}
-	return o.Patch(path)
+	r := &route{}
+	return r.Patch(path)
 }
 
 func (w web) Head(path string) Route {
-	o := route{}
-	return o.Head(path)
+	r := &route{}
+	return r.Head(path)
 }
 
 func (w web) Options(path string) Route {
-	o := route{}
-	return o.Options(path)
-}
-
-func (w *web) Root(root string) {
-	w.root = root
-}
-
-func (w *web) Route(r Route) {
-	w.routers = append(w.routers, r)
-type web struct {
-	routers []Route
-	root    string
-}
-
-func (w web) Get(path string) Route {
-	r := &route{method: http.MethodGet, path: path}
-	return r
-}
-
-func (w web) Post(path string) Route {
-	r := &route{method: http.MethodPost, path: path}
-	return r
-}
-
-func (w web) Put(path string) Route {
-	r := &route{method: http.MethodPut, path: path}
-	return r
-}
-
-func (w web) Delete(path string) Route {
-	r := &route{method: http.MethodDelete, path: path}
-	return r
-}
-
-func (w web) Patch(path string) Route {
-	r := &route{method: http.MethodPatch, path: path}
-	return r
-}
-
-func (w web) Head(path string) Route {
-	r := &route{method: http.MethodHead, path: path}
-	return r
-}
-
-func (w web) Options(path string) Route {
-	r := &route{method: http.MethodOptions, path: path}
-	return r
+	r := &route{}
+	return r.Options(path)
 }
 
 func (w *web) Root(root string) {
@@ -147,9 +103,14 @@ func (w *web) Route(r Route) {
 
 func (w *web) RegisterGinRoutes(engine *gin.Engine) {
 	for _, r := range w.routers {
+		o := DefaultOption()
+		if !r.IsLoginRequired() {
+			o.WithNoLogin()
+		}
+
 		fullPath := path2.Join(w.root, r.GetPath())
-		handler := wrapGinHandler(r.GetHandler(), r.IsLoginRequired())
-		
+		handler := wrapperOptions(r.GetHandler(), o)
+
 		switch r.GetMethod() {
 		case http.MethodGet:
 			engine.GET(fullPath, handler)
@@ -175,6 +136,46 @@ type route struct {
 	method      string
 	path        string
 	contentType ContentType
+}
+
+func (r route) Get(path string) Route {
+	r.method = http.MethodGet
+	return r.Path(path)
+}
+
+func (r route) Post(path string) Route {
+	r.method = http.MethodPost
+	return r.Path(path)
+}
+
+func (r route) Put(path string) Route {
+	r.method = http.MethodPut
+	return r.Path(path)
+}
+
+func (r route) Delete(path string) Route {
+	r.method = http.MethodDelete
+	return r.Path(path)
+}
+
+func (r route) Patch(path string) Route {
+	r.method = http.MethodPatch
+	return r.Path(path)
+}
+
+func (r route) Head(path string) Route {
+	r.method = http.MethodHead
+	return r.Path(path)
+}
+
+func (r route) Options(path string) Route {
+	r.method = http.MethodOptions
+	return r.Path(path)
+}
+
+func (r *route) Path(path string) Route {
+	r.path = path
+	return r
 }
 
 func (r *route) NoLogin() Route {
@@ -206,38 +207,4 @@ func (r *route) GetHandler() Handler {
 
 func (r *route) IsLoginRequired() bool {
 	return !r.noLogin
-}
-
-// wrapGinHandler converts our Handler to gin.HandlerFunc
-func wrapGinHandler(handler Handler, needLogin bool) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Create context wrapper
-		ctx := NewGinContext(c)
-		
-		// TODO: Add login check if needLogin is true
-		// if needLogin {
-		//     // Add authentication middleware logic here
-		// }
-		
-		// Call the handler
-		result, err := handler(ctx)
-		
-		// Handle the response
-		if err != nil {
-			// Handle error response
-			c.JSON(err.Code(), gin.H{
-				"code":    err.Code(),
-				"message": err.Message(),
-				"data":    nil,
-			})
-			return
-		}
-		
-		// Handle success response
-		c.JSON(200, gin.H{
-			"code":    0,
-			"message": "success",
-			"data":    result,
-		})
-	}
 }
